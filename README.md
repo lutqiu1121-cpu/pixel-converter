@@ -3,6 +3,9 @@
 把一张图片压成像素画（默认 32×32），支持预设尺寸 / 自定义宽高，Alpha 二值化去毛边，
 像素级预览（棋盘格透明底），一键导出 PNG。
 
+> 🌐 **在线试玩**：<https://lutqiu1121-cpu.github.io/pixel-converter/>
+> 📦 **下载 APK**：[`pixel-converter-1.0.apk`](../../releases/download/v1.0.0/pixel-converter-1.0.apk)（25 KB）
+
 同一份 HTML 有两个身份：
 
 - **网页版**：`index.html`，浏览器直接打开就能用。
@@ -19,6 +22,7 @@
 - 最小系统：Android 7.0（API 24）
 - 目标系统：Android 14（API 34）
 - 体积：约 25 KB
+- SHA-256：`08151d7c46901371877e778668563ee13197b1a0c0c842b6002e87df75ecf0f5`
 - 不申请任何权限（Android 10+ 走 MediaStore 存图；Android 9 及以下存到应用自己的图片目录）
 
 ## 怎么用
