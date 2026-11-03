@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全能像素转换器</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #2c2c2c; color: white; }
+        
+        /* 棋盘格背景，方便预览透明效果 */
+        canvas { 
+            background: repeating-conic-gradient(#404040 0% 25%, #606060 0% 50%) 50% / 20px 20px;
+            border: 2px solid #555; 
+            image-rendering: pixelated; 
+            width: 256px; 
+            height: 256px; 
+            margin: 20px auto; 
+            display: block; 
+            cursor: pointer;
+            object-fit: contain; /* 保证非正方形图片也能完整显示在预览框里 */
+        }
+        
+        .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 20px; }
+        
+        /* 控制面板的布局 */
+        .row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+        
+        select, input[type="number"], button, .file-label { 
+            padding: 10px 15px; border-radius: 6px; border: none; font-size: 15px; 
+        }
+        
+        select { background: #fff; color: #333; font-weight: bold;}
+        
+        input[type="number"] { width: 60px; text-align: center; background: #444; color: white; border: 1px solid #777; }
+        
+        input[type="file"] { display: none; }
+        
+        .file-label { background: #2196F3; color: white; display: block; font-weight: bold; cursor: pointer; }
+        .file-label:active { background: #1976D2; }
+        
+        button { background: #4CAF50; color: white; display: none; font-weight: bold; cursor: pointer; }
+        button:active { background: #388E3C; }
+        
+        .size-display { font-size: 14px; color: #aaa; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>全能像素转换器</h2>
+    
+    <div class="controls">
+        <div class="row">
+            <label for="sizeSelect">预设：</label>
+            <select id="sizeSelect">
+                <option value="16">16 x 16</option>
+                <option value="24">24 x 24</option>
+                <option value="32" selected>32 x 32</option>
+                <option value="48">48 x 48</option>
+                <option value="64">64 x 64</option>
+                <option value="128">128 x 128</option>
+                <option value="custom">自定义尺寸</option>
+            </select>
+        </div>
+
+        <div class="row" id="customSizeRow" style="display: none;">
+            <label>宽:</label>
+            <input type="number" id="customWidth" value="32" min="1" max="512">
+            <label>高:</label>
+            <input type="number" id="customHeight" value="32" min="1" max="512">
+        </div>
+
+        <label for="upload" class="file-label">📂 点击选择图片</label>
+        <input type="file" id="upload" accept="image/*">
+        
+        <button id="download">⬇️ 下载 PNG</button>
+    </div>
+
+    <canvas id="canvas" width="32" height="32" title="点击这里也可以上传"></canvas>
+    
+    <p class="size-display">当前输出尺寸：<span id="currentSizeText">32 x 32</span></p>
+
+    <script>
+        const upload = document.getElementById('upload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const downloadBtn = document.getElementById('download');
+        const sizeSelect = document.getElementById('sizeSelect');
+        const customSizeRow = document.getElementById('customSizeRow');
+        const customWidth = document.getElementById('customWidth');
+        const customHeight = document.getElementById('customHeight');
+        const currentSizeText = document.getElementById('currentSizeText');
+        
+        const img = new Image();
+        let hasImage = false;
+
+        canvas.addEventListener('click', () => upload.click());
+
+        upload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        img.onload = function() {
+            hasImage = true;
+            processImage();
+        };
+
+        // 监听下拉框变化
+        sizeSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customSizeRow.style.display = 'flex';
+            } else {
+                customSizeRow.style.display = 'none';
+                customWidth.value = this.value;
+                customHeight.value = this.value;
+            }
+            if (hasImage) processImage();
+        });
+
+        // 监听手动输入宽高变化
+        customWidth.addEventListener('input', () => { if (hasImage) processImage(); });
+        customHeight.addEventListener('input', () => { if (hasImage) processImage(); });
+
+        function processImage() {
+            let sizeW = parseInt(sizeSelect.value === 'custom' ? customWidth.value : sizeSelect.value);
+            let sizeH = parseInt(sizeSelect.value === 'custom' ? customHeight.value : sizeSelect.value);
+            
+            // 防止输入空值或非法值
+            if (isNaN(sizeW) || sizeW < 1) sizeW = 1;
+            if (isNaN(sizeH) || sizeH < 1) sizeH = 1;
+
+            currentSizeText.innerText = `${sizeW} x ${sizeH}`;
+
+            canvas.width = sizeW;
+            canvas.height = sizeH;
+
+            // 关闭平滑（最近邻算法）
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, sizeW, sizeH);
+            
+            // 智能裁剪/缩放：保证原图比例不变，铺满画布（如果原图是正方形，宽高又是自定义非正方形，会自动拉伸适配）
+            ctx.drawImage(img, 0, 0, sizeW, sizeH);
+
+            // Alpha 二值化去毛边
+            const imageData = ctx.getImageData(0, 0, sizeW, sizeH);
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i+3] < 128) {
+                    data[i+3] = 0; 
+                } else {
+                    data[i+3] = 255; 
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+            
+            downloadBtn.style.display = 'block';
+        }
+
+        downloadBtn.addEventListener('click', function() {
+            const link = document.createElement('a');
+            link.download = `pixel_${canvas.width}x${canvas.height}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+
+</body>
+</html>
