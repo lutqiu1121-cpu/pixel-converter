@@ -1,4 +1,4 @@
-# 神隐录像素编辑器 Pro · Pixel Editor
+# Cup的像素编辑器 · Pixel Editor
 
 （原名「全能像素转换器」）
 
@@ -8,24 +8,24 @@
 同一份 HTML 有两个身份：
 
 - **网页版**：`index.html`，浏览器直接打开就能用。
-- **Android App**：`dist/pixel-converter-1.3.apk`，装到手机上是一个独立应用，
+- **Android App**：`dist/pixel-converter-1.4.apk`，装到手机上是一个独立应用，
   选图走系统相册/文件选择器，保存直接进系统相册 `Pictures/PixelConverter/`。
 
 整个 App 只有一个 WebView 壳，所有图像处理逻辑仍然是那份 HTML 里的 `<canvas>` 代码。
 
 > 🌐 **在线试玩**：<https://lutqiu1121-cpu.github.io/pixel-converter/>
-> 📦 **下载 APK**：[`pixel-converter-1.3.apk`](../../releases/download/v1.3.0/pixel-converter-1.3.apk)（约 29 KB）
+> 📦 **下载 APK**：[`pixel-converter-1.4.apk`](../../releases/download/v1.4.0/pixel-converter-1.4.apk)（约 33 KB）
 
 ## 下载安装
 
-从 [Releases](../../releases/latest) 下载 `pixel-converter-1.3.apk`，手机上点开安装即可
+从 [Releases](../../releases/latest) 下载 `pixel-converter-1.4.apk`，手机上点开安装即可
 （APK 用 debug 证书签名，首次安装需要允许"从未知来源安装"）。
 
-- 版本：1.3（versionCode 4）
+- 版本：1.4（versionCode 5）
 - 最小系统：Android 7.0（API 24）
 - 目标系统：Android 14（API 34）
-- 体积：约 29 KB
-- SHA-256：`4e987fc9e555ff46bc05d14aa818d416a04e485d72c7fb2d19de77543c184eab`
+- 体积：约 33 KB
+- SHA-256：`842efed269bcf567ea2f52ea448b46af1b5a52b5ca32f46a6e8ef2a4312e5469`
 - 不申请任何权限（Android 10+ 走 MediaStore 存图；Android 9 及以下存到应用自己的图片目录）
 
 ## 怎么用
@@ -52,14 +52,14 @@
 手机上用 Termux + Android SDK 的 `aapt2 / d8 / apksigner` 就够了：
 
 ```bash
-./build.sh      # 产物：dist/pixel-converter-1.3.apk
+./build.sh      # 产物：dist/pixel-converter-1.4.apk
 ```
 
 脚本做的事情：
 
 | 步骤 | 工具 | 说明 |
 | --- | --- | --- |
-| 1 | `scripts/make-icons.py` | 纯标准库手写 PNG，生成各密度图标 + 自适应图标前景 |
+| 1 | `scripts/make-icons.py` | 纯标准库手写 PNG：14×8 字符网格画出像素咖啡杯（杯身 / 咖啡 / 把手 / 托盘），生成各密度图标 + 自适应前景 |
 | 1 | `scripts/make-assets.py` | 把根目录 `index.html` 变换成 `android/assets/index.html`（注入原生保存拦截） |
 | 2 | `aapt2 compile` | 编译 `res/` |
 | 3 | `aapt2 link` | 链接 manifest + 资源 + assets，出壳 APK |
@@ -108,6 +108,7 @@ dist/                           产物
 
 ## 版本记录
 
+- **v1.4**：改名「Cup的像素编辑器」，图标换成像素咖啡杯（杯身 + 咖啡液面 + 环形把手 + 托盘）。
 - **v1.3**：改名「神隐录像素编辑器 Pro」；新增缩放适配模式（拉伸 / 完整包含 / 裁剪填满），处理非正方形原图不再被硬拉伸。
 - **v1.2**：改名「神隐录像素编辑器」；新增漫水填充去白底 + 容差滑杆、手动微调（擦除/恢复笔刷、1/2/3px、撤销 10 步）；保存改为 `navigator.share` 优先 + 长按保存兜底，App 内经捕获阶段拦截走原生相册。
 - **v1.1**：下载/保存按钮改为常驻显示（未选图时提示先选图）；版本号改为单一来源（`build.sh`）。
