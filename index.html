@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>神隐录 - 像素编辑器</title>
+    <title>神隐录 - 像素编辑器 Pro</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #2c2c2c; color: white; touch-action: pan-y; }
         
@@ -60,18 +60,18 @@
 </head>
 <body>
 
-    <h2>神隐录像素编辑器</h2>
+    <h2>神隐录像素编辑器 Pro</h2>
     
     <div class="controls">
         <div class="row">
-            <label for="sizeSelect">预设：</label>
+            <label for="sizeSelect">预设尺寸：</label>
             <select id="sizeSelect">
                 <option value="16">16 x 16</option>
                 <option value="24">24 x 24</option>
                 <option value="32" selected>32 x 32</option>
                 <option value="48">48 x 48</option>
                 <option value="64">64 x 64</option>
-                <option value="custom">自定义尺寸</option>
+                <option value="custom">自定义宽高</option>
             </select>
         </div>
 
@@ -80,6 +80,16 @@
             <input type="number" id="customWidth" value="32" min="1" max="512">
             <label>高:</label>
             <input type="number" id="customHeight" value="32" min="1" max="512">
+        </div>
+
+        <!-- 新增：缩放适配模式 -->
+        <div class="row" style="background: #444; padding: 8px 15px; border-radius: 6px;">
+            <label for="fitMode" style="font-size: 14px;">缩放模式：</label>
+            <select id="fitMode" style="padding: 5px 10px; font-size: 14px;">
+                <option value="stretch">拉伸填满 (变形)</option>
+                <option value="contain" selected>完整包含 (推荐武器)</option>
+                <option value="cover">裁剪填满 (截取中心)</option>
+            </select>
         </div>
 
         <div class="settings-box">
@@ -93,10 +103,8 @@
         <label for="upload" class="file-label">📂 点击选择图片</label>
         <input type="file" id="upload" accept="image/*">
         
-        <!-- 开启微调按钮 -->
         <button id="toggleToolBtn" class="btn-toggle" style="display:none;">🛠️ 开启手动微调模式</button>
         
-        <!-- 微调面板 -->
         <div class="tool-panel" id="toolPanel">
             <div class="row" style="width: 100%;">
                 <button id="modeErase" class="mode-btn active">🧽 擦除 (变透明)</button>
@@ -129,6 +137,8 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
+        const fitMode = document.getElementById('fitMode');
+        
         const toggleToolBtn = document.getElementById('toggleToolBtn');
         const toolPanel = document.getElementById('toolPanel');
         const modeErase = document.getElementById('modeErase');
@@ -139,14 +149,13 @@
         const resultArea = document.getElementById('resultArea');
         const resultImg = document.getElementById('resultImg');
         
-        // 状态变量
         const img = new Image();
         let hasImage = false;
         let isToolMode = false;
         let isDrawing = false;
-        let currentMode = 'erase'; // 'erase' 或 'restore'
+        let currentMode = 'erase'; 
         let historyStack = []; 
-        let baseImageData = null; // 保存未经修改的底图数据（用于恢复）
+        let baseImageData = null; 
 
         upload.addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -179,18 +188,41 @@
             ctx.imageSmoothingEnabled = false;
             ctx.clearRect(0, 0, sizeW, sizeH);
             
-            // 1. 先把缩放后的原始图存入 baseImageData，保留所有颜色和透明度
-            ctx.drawImage(img, 0, 0, sizeW, sizeH);
+            // --- 核心：计算缩放模式 ---
+            let drawW = sizeW;
+            let drawH = sizeH;
+            let offsetX = 0;
+            let offsetY = 0;
+            const mode = fitMode.value;
+
+            if (mode === 'contain') {
+                // 完整包含：计算最小比例，保证图片整个塞进去
+                const scale = Math.min(sizeW / img.width, sizeH / img.height);
+                drawW = img.width * scale;
+                drawH = img.height * scale;
+                offsetX = (sizeW - drawW) / 2;
+                offsetY = (sizeH - drawH) / 2;
+            } else if (mode === 'cover') {
+                // 裁剪填满：计算最大比例，保证铺满画布（超出部分会被裁掉）
+                const scale = Math.max(sizeW / img.width, sizeH / img.height);
+                drawW = img.width * scale;
+                drawH = img.height * scale;
+                offsetX = (sizeW - drawW) / 2;
+                offsetY = (sizeH - drawH) / 2;
+            }
+            // stretch 模式则直接用 sizeW, sizeH，offset 为 0
+
+            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+            
+            // 把底图存下来（供恢复使用）
             baseImageData = ctx.getImageData(0, 0, sizeW, sizeH); 
             
-            // 2. 复制一份用来做去底计算
             const workingData = new ImageData(
                 new Uint8ClampedArray(baseImageData.data), sizeW, sizeH
             );
             const data = workingData.data;
             const tol = parseInt(tolerance.value);
 
-            // 3. 漫水填充去背
             if (removeBg.checked) {
                 const visited = new Uint8Array(sizeW * sizeH);
                 const queue = [];
@@ -230,7 +262,6 @@
                 }
             }
 
-            // 4. 边缘硬化 (把半透明变纯透明，实心变纯实心)
             for (let i = 0; i < data.length; i += 4) {
                 if (data[i+3] < 128) data[i+3] = 0; 
                 else data[i+3] = 255; 
@@ -257,6 +288,7 @@
             document.getElementById('toleranceVal').innerText = this.value;
             if (hasImage) processImage();
         });
+        fitMode.addEventListener('change', () => { if (hasImage) processImage(); }); // 切换适配模式时重新渲染
 
         toggleToolBtn.addEventListener('click', () => {
             isToolMode = !isToolMode;
@@ -319,24 +351,19 @@
             for (let cy = startY; cy <= endY; cy++) {
                 for (let cx = startX; cx <= endX; cx++) {
                     const idx = (cy * canvas.width + cx) * 4;
-
                     if (currentMode === 'erase') {
-                        // 擦除：变透明
                         data[idx + 3] = 0; 
                     } else {
-                        // 恢复：从原图中提取该像素的所有 RGBA
-                        const bIdx = (cy * canvas.width + cx) * 4; // baseImageData 的索引是一样的
-                        data[idx]     = baseImageData.data[bIdx];     // R
-                        data[idx + 1] = baseImageData.data[bIdx + 1]; // G
-                        data[idx + 2] = baseImageData.data[bIdx + 2]; // B
-                        data[idx + 3] = baseImageData.data[bIdx + 3]; // A
+                        data[idx]     = baseImageData.data[idx];     
+                        data[idx + 1] = baseImageData.data[idx + 1]; 
+                        data[idx + 2] = baseImageData.data[idx + 2]; 
+                        data[idx + 3] = baseImageData.data[idx + 3]; 
                     }
                 }
             }
             ctx.putImageData(imageData, 0, 0);
         }
 
-        // 鼠标事件
         canvas.addEventListener('mousedown', (e) => {
             if (!isToolMode) return; 
             isDrawing = true;
@@ -347,7 +374,6 @@
         canvas.addEventListener('mousemove', drawAt);
         window.addEventListener('mouseup', () => isDrawing = false);
 
-        // 触摸事件
         canvas.addEventListener('touchstart', (e) => {
             if (!isToolMode) return;
             isDrawing = true;
@@ -362,7 +388,6 @@
         downloadBtn.addEventListener('click', async function() {
             if (!hasImage) return;
             
-            // 保存前做最后一次“边缘硬化”检查，防止“恢复”回来的半透明毛边进游戏后发白
             const finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const d = finalImageData.data;
             for (let i = 0; i < d.length; i += 4) {
