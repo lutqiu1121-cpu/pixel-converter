@@ -10,8 +10,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-VERSION_NAME="1.1"
-VERSION_CODE="2"
+VERSION_NAME="1.2"
+VERSION_CODE="3"
 MIN_SDK="24"
 TARGET_SDK="34"
 PKG="com.dsharness.pixelconverter"

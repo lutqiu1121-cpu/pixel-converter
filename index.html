@@ -2,10 +2,10 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全能像素转换器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>神隐录 - 像素编辑器</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #2c2c2c; color: white; }
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #2c2c2c; color: white; touch-action: pan-y; }
         
         canvas { 
             background: repeating-conic-gradient(#404040 0% 25%, #606060 0% 50%) 50% / 20px 20px;
@@ -17,6 +17,7 @@
             display: block; 
             cursor: pointer;
             object-fit: contain;
+            touch-action: none;
         }
         
         .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 20px; }
@@ -31,21 +32,35 @@
         input[type="file"] { display: none; }
         
         .file-label { background: #2196F3; color: white; display: block; font-weight: bold; cursor: pointer; width: 200px; margin: 0 auto;}
-        .file-label:active { background: #1976D2; }
+        .btn-primary { background: #4CAF50; color: white; font-weight: bold; cursor: pointer; width: 230px; margin: 10px auto; display: block; }
         
-        /* 下载按钮固定显示 */
-        #download { 
-            background: #4CAF50; color: white; font-weight: bold; cursor: pointer; 
-            width: 232px; margin: 10px auto; display: block; 
+        .btn-toggle { background: #E91E63; color: white; font-weight: bold; cursor: pointer; width: 230px; margin: 0 auto; }
+        .btn-toggle.active { background: #F06292; border: 2px solid white; }
+        
+        .tool-panel { 
+            display: none; flex-direction: column; gap: 10px; align-items: center; 
+            background: #222; padding: 15px; border-radius: 8px; border: 1px solid #444; width: 100%; max-width: 300px;
         }
-        #download:active { background: #388E3C; }
         
-        .size-display { font-size: 14px; color: #aaa; margin-top: 5px; }
+        .mode-btn { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #666; background: #444; color: #ccc; cursor: pointer;}
+        .mode-btn.active { background: #FF9800; color: white; border-color: #FF9800; font-weight: bold;}
+        
+        .settings-box { 
+            background: #333; padding: 15px; border-radius: 8px; width: 100%; max-width: 350px; 
+            display: flex; flex-direction: column; gap: 10px; text-align: left;
+        }
+        
+        #resultArea { display: none; margin-top: 30px; padding: 15px; background: #1e1e1e; border-radius: 10px; border: 1px solid #4CAF50; }
+        #resultImg { 
+            image-rendering: pixelated; width: 128px; 
+            background: repeating-conic-gradient(#404040 0% 25%, #606060 0% 50%) 50% / 10px 10px; border: 1px solid #777;
+        }
+        .tip { color: #4CAF50; font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <h2>全能像素转换器</h2>
+    <h2>神隐录像素编辑器</h2>
     
     <div class="controls">
         <div class="row">
@@ -56,7 +71,6 @@
                 <option value="32" selected>32 x 32</option>
                 <option value="48">48 x 48</option>
                 <option value="64">64 x 64</option>
-                <option value="128">128 x 128</option>
                 <option value="custom">自定义尺寸</option>
             </select>
         </div>
@@ -68,110 +82,310 @@
             <input type="number" id="customHeight" value="32" min="1" max="512">
         </div>
 
+        <div class="settings-box">
+            <label><input type="checkbox" id="removeBg" checked> 🪄 智能去除白底 (仅去边缘)</label>
+            <label>
+                容差: <span id="toleranceVal">235</span>
+                <input type="range" id="tolerance" min="200" max="255" value="235" style="width: 100%;">
+            </label>
+        </div>
+
         <label for="upload" class="file-label">📂 点击选择图片</label>
         <input type="file" id="upload" accept="image/*">
         
-        <!-- 按钮常驻 -->
-        <button id="download">⬇️ 下载 PNG (需先选图)</button>
+        <!-- 开启微调按钮 -->
+        <button id="toggleToolBtn" class="btn-toggle" style="display:none;">🛠️ 开启手动微调模式</button>
+        
+        <!-- 微调面板 -->
+        <div class="tool-panel" id="toolPanel">
+            <div class="row" style="width: 100%;">
+                <button id="modeErase" class="mode-btn active">🧽 擦除 (变透明)</button>
+                <button id="modeRestore" class="mode-btn">🖌️ 恢复 (画回来)</button>
+            </div>
+            <div class="row" style="width: 100%; justify-content: space-between;">
+                <label style="font-size: 14px;">笔刷: 
+                    <select id="brushSize" style="padding:4px; font-size:14px;">
+                        <option value="1">1px</option>
+                        <option value="2" selected>2px</option>
+                        <option value="3">3px</option>
+                    </select>
+                </label>
+                <button id="undoBtn" style="padding: 6px 12px; background:#555; color:white; border:none; border-radius:4px;">↩️ 撤销</button>
+            </div>
+        </div>
+
+        <button id="downloadBtn" class="btn-primary" style="display:none;">⬇️ 生成并保存</button>
     </div>
 
-    <canvas id="canvas" width="32" height="32" title="点击这里也可以上传"></canvas>
+    <canvas id="canvas" width="32" height="32"></canvas>
     
-    <p class="size-display">当前输出尺寸：<span id="currentSizeText">32 x 32</span></p>
+    <div id="resultArea">
+        <div class="tip">✅ 生成成功！请长按保存</div>
+        <img id="resultImg" src="" alt="长按保存">
+    </div>
 
     <script>
         const upload = document.getElementById('upload');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const downloadBtn = document.getElementById('download');
-        const sizeSelect = document.getElementById('sizeSelect');
-        const customSizeRow = document.getElementById('customSizeRow');
-        const customWidth = document.getElementById('customWidth');
-        const customHeight = document.getElementById('customHeight');
-        const currentSizeText = document.getElementById('currentSizeText');
         
+        const toggleToolBtn = document.getElementById('toggleToolBtn');
+        const toolPanel = document.getElementById('toolPanel');
+        const modeErase = document.getElementById('modeErase');
+        const modeRestore = document.getElementById('modeRestore');
+        const brushSize = document.getElementById('brushSize');
+        const undoBtn = document.getElementById('undoBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resultArea = document.getElementById('resultArea');
+        const resultImg = document.getElementById('resultImg');
+        
+        // 状态变量
         const img = new Image();
         let hasImage = false;
-
-        canvas.addEventListener('click', () => upload.click());
+        let isToolMode = false;
+        let isDrawing = false;
+        let currentMode = 'erase'; // 'erase' 或 'restore'
+        let historyStack = []; 
+        let baseImageData = null; // 保存未经修改的底图数据（用于恢复）
 
         upload.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
-            reader.onload = function(event) {
-                img.src = event.target.result;
-            };
+            reader.onload = function(event) { img.src = event.target.result; };
             reader.readAsDataURL(file);
         });
 
         img.onload = function() {
             hasImage = true;
+            toggleToolBtn.style.display = 'block';
+            downloadBtn.style.display = 'block';
+            resultArea.style.display = 'none';
+            isToolMode = false;
+            toggleToolBtn.innerText = "🛠️ 开启手动微调模式";
+            toolPanel.style.display = 'none';
+            historyStack = [];
             processImage();
-            downloadBtn.innerText = "⬇️ 下载 PNG";
         };
 
-        sizeSelect.addEventListener('change', function() {
-            if (this.value === 'custom') {
-                customSizeRow.style.display = 'flex';
-            } else {
-                customSizeRow.style.display = 'none';
-                customWidth.value = this.value;
-                customHeight.value = this.value;
-            }
-            if (hasImage) processImage();
-        });
-
-        customWidth.addEventListener('input', () => { if (hasImage) processImage(); });
-        customHeight.addEventListener('input', () => { if (hasImage) processImage(); });
-
-        function processImage() {
+        function processImage(saveHistory = true) {
             let sizeW = parseInt(sizeSelect.value === 'custom' ? customWidth.value : sizeSelect.value);
             let sizeH = parseInt(sizeSelect.value === 'custom' ? customHeight.value : sizeSelect.value);
-            
             if (isNaN(sizeW) || sizeW < 1) sizeW = 1;
             if (isNaN(sizeH) || sizeH < 1) sizeH = 1;
 
-            currentSizeText.innerText = `${sizeW} x ${sizeH}`;
-
             canvas.width = sizeW;
             canvas.height = sizeH;
-
             ctx.imageSmoothingEnabled = false;
             ctx.clearRect(0, 0, sizeW, sizeH);
-            ctx.drawImage(img, 0, 0, sizeW, sizeH);
-
-            const imageData = ctx.getImageData(0, 0, sizeW, sizeH);
-            const data = imageData.data;
             
+            // 1. 先把缩放后的原始图存入 baseImageData，保留所有颜色和透明度
+            ctx.drawImage(img, 0, 0, sizeW, sizeH);
+            baseImageData = ctx.getImageData(0, 0, sizeW, sizeH); 
+            
+            // 2. 复制一份用来做去底计算
+            const workingData = new ImageData(
+                new Uint8ClampedArray(baseImageData.data), sizeW, sizeH
+            );
+            const data = workingData.data;
+            const tol = parseInt(tolerance.value);
+
+            // 3. 漫水填充去背
+            if (removeBg.checked) {
+                const visited = new Uint8Array(sizeW * sizeH);
+                const queue = [];
+                const isWhite = (x, y) => {
+                    if (x < 0 || x >= sizeW || y < 0 || y >= sizeH) return false;
+                    const i = (y * sizeW + x) * 4;
+                    if (data[i+3] === 0) return true; 
+                    return data[i] > tol && data[i+1] > tol && data[i+2] > tol;
+                };
+
+                for (let x = 0; x < sizeW; x++) {
+                    if (isWhite(x, 0)) { queue.push([x, 0]); visited[0 * sizeW + x] = 1; }
+                    if (isWhite(x, sizeH - 1)) { queue.push([x, sizeH - 1]); visited[(sizeH - 1) * sizeW + x] = 1; }
+                }
+                for (let y = 0; y < sizeH; y++) {
+                    if (isWhite(0, y)) { queue.push([0, y]); visited[y * sizeW + 0] = 1; }
+                    if (isWhite(sizeW - 1, y)) { queue.push([sizeW - 1, y]); visited[y * sizeW + (sizeW - 1)] = 1; }
+                }
+
+                while (queue.length > 0) {
+                    const [cx, cy] = queue.shift();
+                    const idx = (cy * sizeW + cx) * 4;
+                    data[idx + 3] = 0; 
+
+                    const dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+                    for (const [dx, dy] of dirs) {
+                        const nx = cx + dx;
+                        const ny = cy + dy;
+                        if (nx >= 0 && nx < sizeW && ny >= 0 && ny < sizeH) {
+                            const nIdx = ny * sizeW + nx;
+                            if (!visited[nIdx] && isWhite(nx, ny)) {
+                                visited[nIdx] = 1;
+                                queue.push([nx, ny]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. 边缘硬化 (把半透明变纯透明，实心变纯实心)
             for (let i = 0; i < data.length; i += 4) {
-                if (data[i+3] < 128) {
-                    data[i+3] = 0; 
-                } else {
-                    data[i+3] = 255; 
+                if (data[i+3] < 128) data[i+3] = 0; 
+                else data[i+3] = 255; 
+            }
+
+            ctx.putImageData(workingData, 0, 0);
+            
+            if (saveHistory) {
+                historyStack.push(workingData);
+                if (historyStack.length > 10) historyStack.shift(); 
+            }
+        }
+
+        // --- UI 交互 ---
+        document.getElementById('sizeSelect').addEventListener('change', function() {
+            document.getElementById('customSizeRow').style.display = this.value === 'custom' ? 'flex' : 'none';
+            if (this.value !== 'custom') { document.getElementById('customWidth').value = this.value; document.getElementById('customHeight').value = this.value; }
+            if (hasImage) processImage();
+        });
+        document.getElementById('customWidth').addEventListener('input', () => { if (hasImage) processImage(); });
+        document.getElementById('customHeight').addEventListener('input', () => { if (hasImage) processImage(); });
+        removeBg.addEventListener('change', () => { if (hasImage) processImage(); });
+        tolerance.addEventListener('input', function() {
+            document.getElementById('toleranceVal').innerText = this.value;
+            if (hasImage) processImage();
+        });
+
+        toggleToolBtn.addEventListener('click', () => {
+            isToolMode = !isToolMode;
+            if (isToolMode) {
+                toggleToolBtn.innerText = "🛑 关闭微调模式";
+                toggleToolBtn.classList.add('active');
+                toolPanel.style.display = 'flex';
+            } else {
+                toggleToolBtn.innerText = "🛠️ 开启手动微调模式";
+                toggleToolBtn.classList.remove('active');
+                toolPanel.style.display = 'none';
+            }
+        });
+
+        modeErase.addEventListener('click', () => {
+            currentMode = 'erase';
+            modeErase.classList.add('active');
+            modeRestore.classList.remove('active');
+        });
+        modeRestore.addEventListener('click', () => {
+            currentMode = 'restore';
+            modeRestore.classList.add('active');
+            modeErase.classList.remove('active');
+        });
+
+        undoBtn.addEventListener('click', () => {
+            if (historyStack.length > 1) {
+                historyStack.pop(); 
+                const prevData = historyStack[historyStack.length - 1]; 
+                ctx.putImageData(prevData, 0, 0);
+            }
+        });
+
+        // --- 绘制核心逻辑 ---
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const x = Math.floor((clientX - rect.left) / rect.width * canvas.width);
+            const y = Math.floor((clientY - rect.top) / rect.height * canvas.height);
+            return { x, y };
+        }
+
+        function drawAt(e) {
+            if (!isToolMode || !isDrawing) return;
+            e.preventDefault(); 
+
+            const { x, y } = getCanvasCoords(e);
+            if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) return;
+
+            const bSize = parseInt(brushSize.value);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            const startX = Math.max(0, x - Math.floor(bSize/2));
+            const endX = Math.min(canvas.width - 1, x + Math.floor((bSize-1)/2));
+            const startY = Math.max(0, y - Math.floor(bSize/2));
+            const endY = Math.min(canvas.height - 1, y + Math.floor((bSize-1)/2));
+
+            for (let cy = startY; cy <= endY; cy++) {
+                for (let cx = startX; cx <= endX; cx++) {
+                    const idx = (cy * canvas.width + cx) * 4;
+
+                    if (currentMode === 'erase') {
+                        // 擦除：变透明
+                        data[idx + 3] = 0; 
+                    } else {
+                        // 恢复：从原图中提取该像素的所有 RGBA
+                        const bIdx = (cy * canvas.width + cx) * 4; // baseImageData 的索引是一样的
+                        data[idx]     = baseImageData.data[bIdx];     // R
+                        data[idx + 1] = baseImageData.data[bIdx + 1]; // G
+                        data[idx + 2] = baseImageData.data[bIdx + 2]; // B
+                        data[idx + 3] = baseImageData.data[bIdx + 3]; // A
+                    }
                 }
             }
             ctx.putImageData(imageData, 0, 0);
         }
 
-        downloadBtn.addEventListener('click', function() {
-            if (!hasImage) {
-                alert("请先点击上方蓝色按钮选择一张图片！");
-                return;
+        // 鼠标事件
+        canvas.addEventListener('mousedown', (e) => {
+            if (!isToolMode) return; 
+            isDrawing = true;
+            historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            if (historyStack.length > 10) historyStack.shift();
+            drawAt(e);
+        });
+        canvas.addEventListener('mousemove', drawAt);
+        window.addEventListener('mouseup', () => isDrawing = false);
+
+        // 触摸事件
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isToolMode) return;
+            isDrawing = true;
+            historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            if (historyStack.length > 10) historyStack.shift();
+            drawAt(e);
+        }, {passive: false});
+        canvas.addEventListener('touchmove', drawAt, {passive: false});
+        window.addEventListener('touchend', () => isDrawing = false);
+
+        // --- 保存 ---
+        downloadBtn.addEventListener('click', async function() {
+            if (!hasImage) return;
+            
+            // 保存前做最后一次“边缘硬化”检查，防止“恢复”回来的半透明毛边进游戏后发白
+            const finalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const d = finalImageData.data;
+            for (let i = 0; i < d.length; i += 4) {
+                if (d[i+3] < 128) d[i+3] = 0;
+                else d[i+3] = 255;
             }
-            
-            // 尝试直接生成下载链接
-            const link = document.createElement('a');
-            link.download = `pixel_${canvas.width}x${canvas.height}.png`;
-            link.href = canvas.toDataURL('image/png');
-            
-            // 兼容部分手机浏览器
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            ctx.putImageData(finalImageData, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/png');
+            try {
+                if (navigator.share && navigator.canShare) {
+                    const blob = await (await fetch(dataUrl)).blob();
+                    const file = new File([blob], `pixel_${canvas.width}x${canvas.height}.png`, { type: blob.type });
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: '保存像素图' });
+                        return;
+                    }
+                }
+            } catch (err) {}
+            resultImg.src = dataUrl;
+            resultArea.style.display = 'block';
+            resultArea.scrollIntoView({ behavior: 'smooth' });
         });
     </script>
-
 </body>
 </html>
