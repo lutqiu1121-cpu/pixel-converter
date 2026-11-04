@@ -1,7 +1,9 @@
 package com.dsharness.pixelconverter;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentValues;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
@@ -13,6 +15,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -99,6 +102,28 @@ public class MainActivity extends Activity {
                     return false;
                 }
             }
+
+            /** 页面里的 alert（比如"请先选图"）用系统对话框呈现。 */
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message,
+                                     final JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("知道了", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                result.confirm();
+                            }
+                        })
+                        .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                            @Override
+                            public void onCancel(DialogInterface dialog) {
+                                result.cancel();
+                            }
+                        })
+                        .show();
+                return true;
+            }
         });
 
         applySystemBars();
@@ -160,6 +185,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean hasBridge() {
             return true;
+        }
+
+        /** 页面需要一个轻提示时（比如"请先选图"）直接弹 Toast。 */
+        @JavascriptInterface
+        public void toast(String text) {
+            MainActivity.this.toast(text);
         }
 
         /** 前端：canvas.toDataURL('image/png') → 直接落盘到相册。 */

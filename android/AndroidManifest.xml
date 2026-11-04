@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.dsharness.pixelconverter"
-    android:versionCode="1"
-    android:versionName="1.0">
+    package="com.dsharness.pixelconverter">
+    <!-- versionCode / versionName 由 build.sh 的 aapt2 参数注入；manifest 里写了会盖掉命令行参数。 -->
 
     <application
         android:allowBackup="true"

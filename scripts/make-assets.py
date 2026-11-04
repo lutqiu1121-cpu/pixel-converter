@@ -21,30 +21,48 @@ INJECT = """
     </style>
     <script>
     (function () {
-        // 把原生桥的存在告诉页面（用于按钮文案微调）
+        // 原生桥的存在决定"保存"走哪条路；网页版里没有它，行为与原来完全一致
         var bridged = !!(window.AndroidBridge && window.AndroidBridge.savePng);
 
-        // 用 clone 掉原监听器的办法接管下载按钮，避免依赖原代码的字符串
         var btn    = document.getElementById('download');
         var canvas = document.getElementById('canvas');
-        if (btn && canvas) {
-            var fresh = btn.cloneNode(true);
-            btn.parentNode.replaceChild(fresh, btn);
-            if (bridged) fresh.textContent = '⬇️ 保存到相册';
+        if (!btn || !canvas) return;
 
-            fresh.addEventListener('click', function () {
-                var fileName = 'pixel_' + canvas.width + 'x' + canvas.height + '.png';
-                var dataUrl  = canvas.toDataURL('image/png');
-                if (bridged) {
-                    window.AndroidBridge.savePng(dataUrl, fileName);
-                    return;
-                }
-                var a = document.createElement('a');
-                a.download = fileName;
-                a.href = dataUrl;
-                a.click();
-            });
+        // 原页面里的 hasImage 是顶层 let，同一 realm 的后续脚本也能读到
+        function pageHasImage() {
+            try { if (typeof hasImage === 'boolean') return hasImage; } catch (e) {}
+            return true;   // 读不到就不拦，交给下游逻辑
         }
+
+        // clone 掉原监听器：网页版仍走 <a download>，App 里改走原生相册保存
+        var fresh = btn.cloneNode(true);
+        btn.parentNode.replaceChild(fresh, btn);
+        if (bridged) fresh.textContent = '💾 保存到相册 (需先选图)';
+
+        fresh.addEventListener('click', function () {
+            if (!pageHasImage()) {
+                var msg = '请先点击上方蓝色按钮选择一张图片！';
+                if (bridged && window.AndroidBridge.toast) {
+                    window.AndroidBridge.toast(msg);
+                } else {
+                    alert(msg);
+                }
+                return;
+            }
+
+            var fileName = 'pixel_' + canvas.width + 'x' + canvas.height + '.png';
+            var dataUrl  = canvas.toDataURL('image/png');
+            if (bridged) {
+                window.AndroidBridge.savePng(dataUrl, fileName);
+                return;
+            }
+            var a = document.createElement('a');
+            a.download = fileName;
+            a.href = dataUrl;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
     })();
     </script>
 </body>"""

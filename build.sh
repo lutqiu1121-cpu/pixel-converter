@@ -10,7 +10,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-VERSION_NAME="1.0"
+VERSION_NAME="1.1"
+VERSION_CODE="2"
 MIN_SDK="24"
 TARGET_SDK="34"
 PKG="com.dsharness.pixelconverter"
@@ -57,7 +58,7 @@ echo "== 3/6 链接资源（生成壳 APK）=="
     -A android/assets \
     --min-sdk-version "$MIN_SDK" \
     --target-sdk-version "$TARGET_SDK" \
-    --version-code 1 \
+    --version-code "$VERSION_CODE" \
     --version-name "$VERSION_NAME" \
     "$BUILD/res.zip"
 
